@@ -55,7 +55,7 @@ graph TD
 ### 1. Installation & Environment Configuration
 ```bash
 # Clone the repository
-git clone https://github.com/SDAIAAcademy/contract-audit-agent.git
+git clone https://github.com/feras17009-stack/contract-audit-agent.git
 cd contract-audit-agent
 
 # Install dependencies
@@ -115,7 +115,9 @@ jupyter notebook notebooks/capstone_demonstration.ipynb
 
 ## 🏫 Training Program Attribution
 
-This project was developed under the **SDAIA Academy** training program:
-- **Program**: Advanced Agentic AI Systems Engineering
+This project was completed as part of the official **SDAIA Academy** training curriculum:
+- **Program Name**: Advanced Agentic AI Systems Engineering
 - **Institution**: SDAIA Academy (Saudi Data & AI Authority)
-- **Repository Link**: Reference [SDAIA Academy on GitHub](https://github.com/SDAIAAcademy)
+- **Cohort**: Cohort 1
+- **Session Dates**: August 9, 2026 – August 13, 2026 (5-Day Advanced Capstone, 30 Training Hours)
+- **Official Organization**: Reference [SDAIA Academy on GitHub](https://github.com/SDAIAAcademy)
