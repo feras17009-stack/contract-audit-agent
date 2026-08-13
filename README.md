@@ -8,9 +8,7 @@ An enterprise-grade, multi-agent AI system that automates vendor contract auditi
 
 ---
 
-## 🎯 Official Capstone Project Specification
-
-![SDAIA Capstone Project Specification](docs/images/capstone_project_spec.png)
+## 🎯 Capstone Architecture & System Blueprint
 
 The system ingests vendor contract PDFs from cloud object storage (**MinIO**), parses and structures legal clauses, evaluates compliance risks against vector-indexed corporate policies (**ChromaDB**), enforces security guardrails (prompt injection & PII masking), tracks latency and cost metrics, enables **Human-in-the-Loop (HITL)** approvals for high-risk clauses, and records an immutable audit trail in SQLite.
 
@@ -101,6 +99,8 @@ api      | INFO:     Uvicorn running on http://0.0.0.0:8080 (Press CTRL+C to qui
 ## 🔍 Observability & Telemetry Spans (Arize Phoenix & OpenInference)
 
 The system automatically emits OpenTelemetry spans for every agent step, node transition, LLM call, and tool execution to **Arize Phoenix** (`http://localhost:6006`):
+
+![Arize Phoenix LLM Tracing Live UI Screenshot](docs/images/phoenix_ui_trace.png)
 
 ```text
 ⚡ Arize Phoenix Trace Session Logs (OpenInference Instrumentation):
