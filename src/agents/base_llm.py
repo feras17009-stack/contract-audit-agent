@@ -31,7 +31,7 @@ def get_genai_client(api_key: Optional[str] = None) -> Optional[Any]:
 
     key = api_key or os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
     if not key or key == "your_gemini_api_key_here":
-        logger.info("GOOGLE_API_KEY not provided. Operating in agent rule-evaluation mode.")
+        logger.info("GOOGLE_API_KEY not configured. Operating in offline evaluation engine mode.")
         return None
 
     try:
@@ -69,6 +69,13 @@ def invoke_llm_with_retry(client: Any, prompt: str, max_retries: int = 3) -> str
     raise RuntimeError(f"Gemini LLM call failed after {max_retries} attempts: {last_error}")
 
 
+def estimate_tokens(text: str) -> int:
+    """Estimates token count accurately from text string length (approx 4 chars per token)."""
+    words = len(text.split())
+    chars = len(text)
+    return max(1, int((words * 1.3) + (chars / 8)))
+
+
 def analyze_clause_with_gemini(clause_text: str, policy_context: str, api_key: Optional[str] = None) -> Dict[str, Any]:
     """
     Executes a direct LLM reasoning call using Google Gemini API (google-genai SDK) on a target contract clause.
@@ -101,16 +108,21 @@ def analyze_clause_with_gemini(clause_text: str, policy_context: str, api_key: O
                 contents=prompt
             )
 
-            # Extract usage metadata from response
+            # Extract usage metadata directly from live Gemini API response
             usage = getattr(response, "usage_metadata", None)
-            input_tokens = getattr(usage, "prompt_token_count", len(prompt.split())) if usage else len(prompt.split())
-            output_tokens = getattr(usage, "candidates_token_count", len(response.text.split())) if usage else len(response.text.split())
-            total_tokens = getattr(usage, "total_token_count", input_tokens + output_tokens) if usage else input_tokens + output_tokens
+            if usage and hasattr(usage, "prompt_token_count") and usage.prompt_token_count:
+                input_tokens = usage.prompt_token_count
+                output_tokens = getattr(usage, "candidates_token_count", estimate_tokens(response.text))
+                total_tokens = getattr(usage, "total_token_count", input_tokens + output_tokens)
+            else:
+                input_tokens = estimate_tokens(prompt)
+                output_tokens = estimate_tokens(response.text)
+                total_tokens = input_tokens + output_tokens
 
             return {
                 "raw_text": response.text,
                 "model": model_name,
-                "status": "SUCCESS_LIVE_API",
+                "status": "LIVE_GEMINI_API_SUCCESS",
                 "usage_metadata": {
                     "prompt_token_count": input_tokens,
                     "candidates_token_count": output_tokens,
@@ -164,13 +176,16 @@ def analyze_clause_with_gemini(clause_text: str, policy_context: str, api_key: O
         f"PROPOSED REMEDIATION: {remediation}"
     )
 
+    p_tokens = estimate_tokens(prompt)
+    c_tokens = estimate_tokens(raw_text)
+
     return {
         "raw_text": raw_text,
-        "model": "gemini-agent-engine",
-        "status": "EVALUATED_DYNAMICALLY",
+        "model": "offline-evaluation-engine",
+        "status": "OFFLINE_DETERMINISTIC_EVALUATION",
         "usage_metadata": {
-            "prompt_token_count": len(prompt.split()),
-            "candidates_token_count": len(raw_text.split()),
-            "total_token_count": len(prompt.split()) + len(raw_text.split())
+            "prompt_token_count": p_tokens,
+            "candidates_token_count": c_tokens,
+            "total_token_count": p_tokens + c_tokens
         }
     }
