@@ -42,8 +42,14 @@ def audit_logger_node(state: ContractAuditState) -> Dict[str, Any]:
         )
         persisted_records.append(db_rec)
 
-    final_status = state.get("status", "COMPLETED")
-    if final_status == "IN_PROGRESS":
+    # Determine final workflow status
+    if state.get("status") == "BLOCKED_SECURITY":
+        final_status = "BLOCKED_SECURITY"
+    elif state.get("human_approved") is True:
+        final_status = "COMPLETED"
+    elif state.get("human_approved") is False:
+        final_status = "REJECTED"
+    else:
         final_status = "COMPLETED"
 
     return {

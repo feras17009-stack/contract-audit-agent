@@ -96,11 +96,9 @@ def test_graph_reflexion_loop_and_hitl_pause():
     assert current_snapshot.next == ("human_approval",)
     assert current_snapshot.values["reflexion_attempts"] >= 1
 
-    # Resume graph execution with human approval input
-    resumed_state = graph.invoke(
-        {"human_approved": True, "human_comments": "Approved with finance waiver."},
-        config=config
-    )
+    # Update state with human approval input and resume graph execution
+    graph.update_state(config, {"human_approved": True, "human_comments": "Approved with finance waiver."})
+    resumed_state = graph.invoke(None, config=config)
 
     assert resumed_state["status"] == "COMPLETED"
     assert resumed_state["human_approved"] is True
