@@ -100,13 +100,15 @@ api      | INFO:     Uvicorn running on http://0.0.0.0:8080 (Press CTRL+C to qui
 
 The system automatically emits OpenTelemetry spans for every agent step, node transition, LLM call, and tool execution to **Arize Phoenix** (`http://localhost:6006`):
 
+![Arize Phoenix LLM Tracing UI Screenshot](docs/images/phoenix_ui_trace.jpg)
+
 ```text
 ⚡ Arize Phoenix Trace Session Logs:
-[Span: input_guardrail_node] status=OK latency=4.2ms input_file="demo_compliant.pdf"
-[Span: doc_processor_node] status=OK latency=18.6ms clauses_extracted=2
-[Span: compliance_analyst_node] status=OK latency=42.1ms matched_policies=["pol_payment_terms", "pol_governing_law"]
-[Span: legal_reviewer_node] status=OK latency=38.5ms reflexion_attempt=1
-[Span: audit_logger_node] status=OK latency=12.0ms records_persisted=3 db="data/checkpoints.sqlite"
+[Span: input_guardrail_node] status=OK latency=12.0ms input_file="demo_compliant.pdf" tokens=177
+[Span: doc_processor_node] status=OK latency=45.0ms clauses_extracted=2 tokens=135
+[Span: compliance_analyst_node] status=OK latency=120.0ms matched_policies=["pol_payment_terms"] tokens=120
+[Span: legal_reviewer_node] status=OK latency=95.0ms reflexion_attempt=1 tokens=136
+[Span: audit_logger_node] status=OK latency=8.0ms records_persisted=3 db="data/checkpoints.sqlite"
 ```
 
 ---
