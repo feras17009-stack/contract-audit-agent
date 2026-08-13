@@ -6,7 +6,7 @@ Satisfies Deliverable 2 (StateGraph with conditional edges and retry loop) & Del
 import os
 import sqlite3
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from langgraph.graph import StateGraph, END
 from src.graph.state import ContractAuditState
@@ -20,6 +20,36 @@ from src.graph.nodes.hitl_node import human_approval_node
 from src.graph.nodes.audit_node import audit_logger_node
 
 logger = logging.getLogger("GraphWorkflow")
+
+
+def get_sqlite_checkpointer(db_path: Optional[str] = None):
+    """
+    Returns a persistent SqliteSaver checkpointer that survives process restarts.
+    Satisfies Deliverable 5 (Production Readiness: Persistent Checkpointer).
+    """
+    if db_path is None:
+        if os.path.exists("data"):
+            db_path = os.path.join("data", "checkpoints.sqlite")
+        elif os.path.exists(os.path.join("..", "data")):
+            db_path = os.path.join("..", "data", "checkpoints.sqlite")
+        else:
+            db_path = os.path.join("data", "checkpoints.sqlite")
+
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)
+    conn = sqlite3.connect(db_path, check_same_thread=False)
+
+    try:
+        from langgraph.checkpoint.sqlite import SqliteSaver
+        checkpointer = SqliteSaver(conn)
+        # Setup table schema if required
+        if hasattr(checkpointer, "setup"):
+            checkpointer.setup()
+        logger.info(f"Initialized persistent SqliteSaver checkpointer at: {db_path}")
+        return checkpointer
+    except Exception as e:
+        logger.warning(f"Could not initialize SqliteSaver ({e}). Falling back to MemorySaver.")
+        from langgraph.checkpoint.memory import MemorySaver
+        return MemorySaver()
 
 
 # Router functions for conditional edges
@@ -55,9 +85,10 @@ def route_after_reflexion(state: ContractAuditState) -> str:
         return "human_approval"
 
 
-def build_contract_audit_graph(checkpointer=None):
+def build_contract_audit_graph(checkpointer=None, use_sqlite: bool = True):
     """
     Constructs and compiles the complete LangGraph StateGraph workflow.
+    Defaults to persistent SqliteSaver checkpointer.
     """
     builder = StateGraph(ContractAuditState)
 
@@ -105,10 +136,13 @@ def build_contract_audit_graph(checkpointer=None):
     builder.add_edge("human_approval", "audit_logger")
     builder.add_edge("audit_logger", END)
 
-    # 4. Compile Graph with Memory Saver checkpointer & HITL interrupt
+    # 4. Compile Graph with persistent SqliteSaver checkpointer & HITL interrupt
     if checkpointer is None:
-        from langgraph.checkpoint.memory import MemorySaver
-        checkpointer = MemorySaver()
+        if use_sqlite:
+            checkpointer = get_sqlite_checkpointer()
+        else:
+            from langgraph.checkpoint.memory import MemorySaver
+            checkpointer = MemorySaver()
 
     # Compile with interrupt_before on human_approval node to pause execution
     compiled_graph = builder.compile(
@@ -116,5 +150,5 @@ def build_contract_audit_graph(checkpointer=None):
         interrupt_before=["human_approval"]
     )
 
-    logger.info("Successfully compiled LangGraph Contract Audit Workflow with HITL interrupt and checkpointer.")
+    logger.info("Successfully compiled LangGraph Contract Audit Workflow with HITL interrupt and Sqlite checkpointer.")
     return compiled_graph

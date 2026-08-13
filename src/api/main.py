@@ -28,8 +28,8 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Global compiled graph instance
-audit_graph = build_contract_audit_graph()
+# Global compiled graph instance with persistent Sqlite checkpointer
+audit_graph = build_contract_audit_graph(use_sqlite=True)
 
 
 class ApprovalRequest(BaseModel):
@@ -108,6 +108,7 @@ async def upload_contract(file: UploadFile = File(...)):
 async def approve_contract(thread_id: str, payload: ApprovalRequest):
     """
     Resumes graph execution after Human-in-the-Loop approval decision.
+    Uses proper LangGraph state update and checkpoint resume.
     """
     config = {"configurable": {"thread_id": thread_id}}
     
@@ -118,23 +119,27 @@ async def approve_contract(thread_id: str, payload: ApprovalRequest):
     except Exception as e:
         raise HTTPException(status_code=404, detail=f"Invalid thread ID '{thread_id}': {e}")
 
-    logger.info(f"Resuming graph for thread '{thread_id}' with approval={payload.approved}...")
+    logger.info(f"Updating checkpoint state & resuming graph for thread '{thread_id}' (approved={payload.approved})...")
 
-    # Resume graph execution passing human decision
-    resumed_state = audit_graph.invoke(
+    # 1. Update state at human_approval node in checkpointer
+    audit_graph.update_state(
+        config,
         {
             "human_approved": payload.approved,
             "human_comments": payload.comments
         },
-        config=config
+        as_node="human_approval"
     )
+
+    # 2. Resume graph execution from checkpoint
+    resumed_state = audit_graph.invoke(None, config=config)
 
     return {
         "thread_id": thread_id,
         "status": resumed_state.get("status", "COMPLETED"),
         "human_approved": payload.approved,
         "comments": payload.comments,
-        "message": f"Graph resumed. Final status: {resumed_state.get('status')}"
+        "message": f"Graph resumed successfully from checkpoint. Final status: {resumed_state.get('status')}"
     }
 
 
