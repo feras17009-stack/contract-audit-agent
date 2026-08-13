@@ -52,7 +52,9 @@ def fetch_contract_from_minio(bucket_name: str, object_name: str, local_save_pat
     possible_paths = [
         object_name,
         os.path.join("data", "contracts", object_name),
-        os.path.join("data", object_name)
+        os.path.join("data", object_name),
+        os.path.join("..", "data", "contracts", object_name),
+        os.path.join("..", "data", object_name)
     ]
     for path in possible_paths:
         if os.path.exists(path):

@@ -11,13 +11,19 @@ from typing import Dict, Any, List
 
 logger = logging.getLogger("AuditTools")
 
-DB_PATH = os.path.join("data", "compliance_audit.db")
+def get_db_path():
+    if os.path.exists("data"):
+        return os.path.join("data", "compliance_audit.db")
+    elif os.path.exists(os.path.join("..", "data")):
+        return os.path.join("..", "data", "compliance_audit.db")
+    return os.path.join("data", "compliance_audit.db")
 
 
 def init_audit_database():
     """Ensures SQLite audit trail database table exists."""
-    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
+    db_path = get_db_path()
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)
+    conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS compliance_audit_log (
@@ -53,7 +59,7 @@ def log_audit_entry(
     Writes an immutable compliance audit record to the SQLite database.
     """
     init_audit_database()
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(get_db_path())
     cursor = conn.cursor()
 
     cursor.execute("""
@@ -90,7 +96,7 @@ def get_audit_trail_by_thread(thread_id: str) -> List[Dict[str, Any]]:
     Retrieves all compliance audit log records for a given thread_id.
     """
     init_audit_database()
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(get_db_path())
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
