@@ -8,7 +8,9 @@ An enterprise-grade, multi-agent AI system that automates vendor contract auditi
 
 ---
 
-## 🎯 Capstone Architecture & System Blueprint
+## 🎯 Official Capstone Project Specification
+
+![SDAIA Capstone Project Specification](docs/images/capstone_project_spec.png)
 
 The system ingests vendor contract PDFs from cloud object storage (**MinIO**), parses and structures legal clauses, evaluates compliance risks against vector-indexed corporate policies (**ChromaDB**), enforces security guardrails (prompt injection & PII masking), tracks latency and cost metrics, enables **Human-in-the-Loop (HITL)** approvals for high-risk clauses, and records an immutable audit trail in SQLite.
 
@@ -71,7 +73,7 @@ cp .env.example .env
 docker-compose up --build
 ```
 
-#### 🐳 Docker Compose Startup Log Snippet
+#### 🐳 Docker Compose Startup Output
 ```text
 [+] Running 4/4
  ✔ Container contract-audit-minio    Healthy                                          0.5s 
@@ -100,10 +102,8 @@ api      | INFO:     Uvicorn running on http://0.0.0.0:8080 (Press CTRL+C to qui
 
 The system automatically emits OpenTelemetry spans for every agent step, node transition, LLM call, and tool execution to **Arize Phoenix** (`http://localhost:6006`):
 
-![Arize Phoenix LLM Tracing UI Screenshot](docs/images/phoenix_ui_trace.jpg)
-
 ```text
-⚡ Arize Phoenix Trace Session Logs:
+⚡ Arize Phoenix Trace Session Logs (OpenInference Instrumentation):
 [Span: input_guardrail_node] status=OK latency=12.0ms input_file="demo_compliant.pdf" tokens=177
 [Span: doc_processor_node] status=OK latency=45.0ms clauses_extracted=2 tokens=135
 [Span: compliance_analyst_node] status=OK latency=120.0ms matched_policies=["pol_payment_terms"] tokens=120
