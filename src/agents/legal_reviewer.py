@@ -1,12 +1,12 @@
 """
 Agent 3: Legal Reviewer / Critic Agent.
-Role: Performs Reflexion and self-critique on high-risk/ambiguous clause assessments, offering remediation and deciding HITL routing.
+Role: Performs Reflexion and self-critique on high-risk/ambiguous clause assessments, offering clause-specific remediation.
 Satisfies Deliverable 1 (Reflexion pattern) & Deliverable 3 (Multi-Agent System).
 """
 
 import logging
 from typing import Dict, Any, List
-from src.agents.base_llm import get_llm, invoke_llm_with_retry
+from src.agents.base_llm import analyze_clause_with_gemini
 
 logger = logging.getLogger("LegalReviewerAgent")
 
@@ -26,51 +26,34 @@ class LegalReviewerAgent:
 
         logger.info(f"[Legal Reviewer Agent] Performing Reflexion attempt #{attempt_count} on '{clause_title}' (Risk: {current_risk})")
 
-        remediation_suggestion = ""
-        revised_risk = current_risk
+        clause_lower = clause_text.lower()
+        title_lower = clause_title.lower()
+
+        # Generate clause-specific remediation recommendations
+        if "payment" in title_lower or "net 90" in clause_lower or "payment" in clause_lower:
+            remediation_suggestion = (
+                "PROPOSED REMEDIATION CLAUSE: Amend payment terms to Net 60 days from invoice receipt, "
+                "or require a 2% early payment discount if Net 90 is granted."
+            )
+        elif "liability" in title_lower or "indemnification" in title_lower or "unlimited" in clause_lower:
+            remediation_suggestion = (
+                "PROPOSED REMEDIATION CLAUSE: Insert mutual liability cap limiting total liability "
+                "to 2x annual contract fees ($500,000 max), excluding IP infringement."
+            )
+        elif "privacy" in title_lower or "data" in title_lower or "encryption" in clause_lower:
+            remediation_suggestion = (
+                "PROPOSED REMEDIATION CLAUSE: Mandate AES-256 encryption at rest, TLS 1.3 in transit, "
+                "and 24-hour mandatory security breach notification."
+            )
+        else:
+            remediation_suggestion = f"PROPOSED REMEDIATION CLAUSE: Insert standard corporate compliance rider for '{clause_title}'."
+
+        revised_risk = "High" if attempt_count >= 2 else "Medium"
         requires_human_approval = True
 
-        # Rule-based Reflexion logic
-        if "Payment" in clause_title or "net 90" in clause_text.lower():
-            remediation_suggestion = (
-                "PROPOSED REMEDIATION CLAUSE: Amend payment terms to Net 60 days, "
-                "or require 2% early payment discount if Net 90 is requested."
-            )
-            # If attempt 1, try re-evaluating risk with proposed compromise
-            if attempt_count == 1:
-                revised_risk = "Medium"
-                requires_human_approval = True
-            else:
-                revised_risk = "High"
-                requires_human_approval = True
-
-        elif "liability" in clause_text.lower() or "unlimited" in clause_text.lower():
-            remediation_suggestion = (
-                "PROPOSED REMEDIATION CLAUSE: Insert mutual liability cap at $1,000,000 USD "
-                "or 2x annual contract fees, excluding confidentiality breaches."
-            )
-            revised_risk = "High"
-            requires_human_approval = True
-
-        else:
-            remediation_suggestion = f"General review recommended for clause: '{clause_title}'."
-            requires_human_approval = (revised_risk == "High")
-
-        # LLM Self-Critique if API key available
-        llm = get_llm()
-        if llm:
-            try:
-                prompt = (
-                    f"You are a Senior Corporate General Counsel reviewing a subordinate analyst's finding.\n"
-                    f"CLAUSE: {clause_text[:400]}\n"
-                    f"INITIAL RISK: {current_risk}\n"
-                    f"INITIAL REASON: {reason}\n\n"
-                    f"Critique this finding. Provide a specific compromise remediation clause and confirm if Human Approval is required."
-                )
-                reflexion_output = invoke_llm_with_retry(llm, prompt)
-                logger.info(f"[Legal Reviewer Agent] LLM Reflexion: {reflexion_output[:120]}")
-            except Exception as e:
-                logger.warning(f"LLM Reflexion call failed: {e}")
+        # Call Gemini LLM for dynamic critique if key available
+        policy_ctx = f"Reflexion evaluation for {clause_title} (Attempt #{attempt_count})"
+        llm_critique = analyze_clause_with_gemini(clause_text, policy_ctx)
 
         return {
             "clause_id": audit_item.get("clause_id"),
@@ -80,5 +63,7 @@ class LegalReviewerAgent:
             "reflexion_attempt": attempt_count,
             "remediation_suggestion": remediation_suggestion,
             "requires_human_approval": requires_human_approval,
-            "reviewer_notes": f"Reflexion complete on attempt #{attempt_count}. Remediation proposed."
+            "reviewer_notes": f"Reflexion attempt #{attempt_count} complete. Remediation proposed: {remediation_suggestion[:60]}...",
+            "llm_trace": llm_critique.get("raw_text"),
+            "usage_metadata": llm_critique.get("usage_metadata", {})
         }

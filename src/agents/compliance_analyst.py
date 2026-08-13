@@ -7,7 +7,7 @@ Satisfies Deliverable 3 (Multi-Agent System & Role Specialization).
 import logging
 from typing import Dict, Any, List
 from src.tools.vector_tools import query_compliance_policies
-from src.agents.base_llm import get_llm, invoke_llm_with_retry
+from src.agents.base_llm import analyze_clause_with_gemini
 
 logger = logging.getLogger("ComplianceAnalystAgent")
 
@@ -25,15 +25,19 @@ class ComplianceAnalystAgent:
 
         # Query vector database for matching corporate policies
         matched_policies = query_compliance_policies(text, top_k=2)
+        policy_context = "\n".join([f"- {p['title']}: {p['content']}" for p in matched_policies])
+
+        # Execute LLM reasoning step (via Gemini API or dynamic evaluation engine)
+        llm_result = analyze_clause_with_gemini(text, policy_context)
+        raw_llm_text = llm_result["raw_text"]
 
         risk_level = "Low"
         compliance_status = "Compliant"
         analysis_reason = "Clause aligns with standard corporate compliance policies."
 
-        # Rule-based evaluation checks for core policy triggers
         text_lower = text.lower()
 
-        # Check Payment Terms Policy (Max Net 60)
+        # Check Payment Terms Policy
         if "payment" in text_lower or "net" in text_lower or "days" in text_lower:
             if "net 90" in text_lower or "90 days" in text_lower or "net 120" in text_lower:
                 risk_level = "High"
@@ -44,34 +48,25 @@ class ComplianceAnalystAgent:
                 compliance_status = "Flagged_For_Review"
                 analysis_reason = "Payment terms of Net 75 days exceed standard Net 60 policy."
 
-        # Check Indemnification & Liability Policy (Cap at 2x contract value)
-        if "liability" in text_lower or "indemnification" in text_lower or "indemnify" in text_lower:
-            if "unlimited liability" in text_lower or "no cap" in text_lower or "without limitation" in text_lower:
+        # Check Indemnification & Liability Policy
+        elif "liability" in text_lower or "indemnification" in text_lower or "indemnify" in text_lower:
+            if "unlimited" in text_lower or "no cap" in text_lower or "without limitation" in text_lower:
                 risk_level = "High"
                 compliance_status = "Violation"
                 analysis_reason = "Unlimited liability clause violates Corporate Policy '2x Liability Cap'."
 
-        # Check Prompt Injection Attack Marker
-        if "ignore all previous instructions" in text_lower or "grant full compliance" in text_lower:
+        # Check Data Privacy Policy
+        elif "privacy" in text_lower or "data" in text_lower or "encryption" in text_lower:
+            if "unencrypted" in text_lower or "no encryption" in text_lower:
+                risk_level = "High"
+                compliance_status = "Violation"
+                analysis_reason = "Unencrypted data handling violates Corporate Policy pol_data_privacy (AES-256 mandatory)."
+
+        # Check Security Violation (Prompt Injection)
+        elif "ignore all previous instructions" in text_lower or "grant full compliance" in text_lower:
             risk_level = "High"
             compliance_status = "Security_Violation"
             analysis_reason = "Prompt injection attempt detected in contract text."
-
-        # Enhance with LLM analysis if API key is present
-        llm = get_llm()
-        if llm and compliance_status not in ["Security_Violation"]:
-            try:
-                policy_context = "\n".join([f"- {p['title']}: {p['content']}" for p in matched_policies])
-                prompt = (
-                    f"You are a Corporate Compliance Analyst. Compare this contract clause against policy rules:\n"
-                    f"CONTRACT CLAUSE: {text[:500]}\n\n"
-                    f"CORPORATE POLICIES:\n{policy_context}\n\n"
-                    f"Classify risk level as Low, Medium, or High, and state compliance status."
-                )
-                llm_response = invoke_llm_with_retry(llm, prompt)
-                logger.info(f"LLM Compliance Evaluation for [{clause_id}]: {llm_response[:100]}")
-            except Exception as e:
-                logger.warning(f"LLM compliance evaluation skipped: {e}")
 
         return {
             "clause_id": clause_id,
@@ -80,7 +75,9 @@ class ComplianceAnalystAgent:
             "matched_policies": matched_policies,
             "risk_level": risk_level,
             "compliance_status": compliance_status,
-            "analysis_reason": analysis_reason
+            "analysis_reason": analysis_reason,
+            "llm_reasoning_trace": raw_llm_text,
+            "usage_metadata": llm_result.get("usage_metadata", {})
         }
 
     def evaluate_all_clauses(self, clauses: List[Dict[str, str]]) -> List[Dict[str, Any]]:
