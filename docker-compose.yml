@@ -1,0 +1,93 @@
+version: '3.8'
+
+services:
+  # --- MinIO: Simulated Cloud Object Storage (S3-compatible) ---
+  minio:
+    image: minio/minio:latest
+    container_name: minio-storage
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # --- MinIO Init: One-shot container to create bucket idempotently ---
+  mc-init:
+    image: minio/mc:latest
+    container_name: minio-bucket-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      /usr/bin/mc alias set myminio http://minio:9000 minioadmin minioadmin;
+      /usr/bin/mc mb --ignore-existing myminio/contracts-bucket;
+      /usr/bin/mc anonymous set download myminio/contracts-bucket;
+      echo 'MinIO bucket contracts-bucket created successfully!';
+      exit 0;
+      "
+
+  # --- ChromaDB: Vector Store for Corporate Compliance Policies ---
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: chromadb-vectorstore
+    ports:
+      - "8000:8000"
+    environment:
+      - IS_PERSISTENT=TRUE
+      - ANONYMIZED_TELEMETRY=FALSE
+    volumes:
+      - chroma_data:/chroma/chroma
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/api/v1/heartbeat || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # --- Arize Phoenix: Local Observability & Tracing UI ---
+  phoenix:
+    image: arizephoenix/phoenix:latest
+    container_name: phoenix-tracing
+    ports:
+      - "6006:6006"
+    environment:
+      - PHOENIX_PORT=6006
+
+  # --- Agent FastAPI Service (Target deployment container) ---
+  agent-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: agent-api-service
+    ports:
+      - "8080:8080"
+    environment:
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - MINIO_BUCKET_NAME=contracts-bucket
+      - CHROMADB_HOST=chromadb
+      - CHROMADB_PORT=8000
+      - OBSERVABILITY_PROVIDER=phoenix
+      - PHOENIX_COLLECTOR_ENDPOINT=http://phoenix:6006
+    depends_on:
+      minio:
+        condition: service_healthy
+      chromadb:
+        condition: service_healthy
+    profiles:
+      - api # Can be started via docker-compose --profile api up
+
+volumes:
+  minio_data:
+  chroma_data:
