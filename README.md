@@ -118,6 +118,6 @@ jupyter notebook notebooks/capstone_demonstration.ipynb
 This project was completed as part of the official **SDAIA Academy** training curriculum:
 - **Program Name**: Advanced Agentic AI Systems Engineering
 - **Institution**: SDAIA Academy (Saudi Data & AI Authority)
-- **Cohort**: Cohort 1
+- **Cohort**: Cohort 3
 - **Session Dates**: August 9, 2026 – August 13, 2026 (5-Day Advanced Capstone, 30 Training Hours)
 - **Official Organization**: Reference [SDAIA Academy on GitHub](https://github.com/SDAIAAcademy)
