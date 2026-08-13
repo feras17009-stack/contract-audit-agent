@@ -40,6 +40,8 @@ data/minio_data/
 *.db
 *.sqlite
 *.sqlite3
+*.sqlite-shm
+*.sqlite-wal
 
 # Uploaded PDFs & Temp storage
 uploads/
