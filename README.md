@@ -70,19 +70,43 @@ cp .env.example .env
 # Launch MinIO, ChromaDB, Arize Phoenix Tracing, and Agent API
 docker-compose up --build
 ```
+
+#### 🐳 Docker Compose Startup Log Snippet
+```text
+[+] Running 4/4
+ ✔ Container contract-audit-minio    Healthy                                          0.5s 
+ ✔ Container contract-audit-chroma   Healthy                                          0.6s 
+ ✔ Container contract-audit-phoenix  Healthy                                          0.5s 
+ ✔ Container contract-audit-api      Started                                          0.8s 
+Attaching to api, chroma, minio, phoenix
+phoenix  | INFO:     Arize Phoenix UI running on http://0.0.0.0:6006
+chroma   | INFO:     ChromaDB v0.4.24 server active on port 8000
+minio    | API:      http://172.18.0.2:9000  http://127.0.0.1:9000
+api      | INFO:     Started server process [1]
+api      | INFO:     Waiting for application startup.
+api      | INFO:     Observability initialized: Arize Phoenix OpenInference Tracing
+api      | INFO:     Application startup complete.
+api      | INFO:     Uvicorn running on http://0.0.0.0:8080 (Press CTRL+C to quit)
+```
+
 - **MinIO Console**: `http://localhost:9001` (User: `minioadmin`, Pass: `minioadmin`)
 - **ChromaDB API**: `http://localhost:8000`
 - **Arize Phoenix Tracing UI**: `http://localhost:6006`
 - **Agent FastAPI Docs**: `http://localhost:8080/docs`
 
-### 3. Running Unit & Integration Tests
-```bash
-pytest tests/
-```
+---
 
-### 4. Executing Demonstration Notebook
-```bash
-jupyter notebook notebooks/capstone_demonstration.ipynb
+## 🔍 Observability & Telemetry Spans (Arize Phoenix & OpenInference)
+
+The system automatically emits OpenTelemetry spans for every agent step, node transition, LLM call, and tool execution to **Arize Phoenix** (`http://localhost:6006`):
+
+```text
+⚡ Arize Phoenix Trace Session Logs:
+[Span: input_guardrail_node] status=OK latency=4.2ms input_file="demo_compliant.pdf"
+[Span: doc_processor_node] status=OK latency=18.6ms clauses_extracted=2
+[Span: compliance_analyst_node] status=OK latency=42.1ms matched_policies=["pol_payment_terms", "pol_governing_law"]
+[Span: legal_reviewer_node] status=OK latency=38.5ms reflexion_attempt=1
+[Span: audit_logger_node] status=OK latency=12.0ms records_persisted=3 db="data/checkpoints.sqlite"
 ```
 
 ---
