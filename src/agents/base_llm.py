@@ -42,6 +42,32 @@ def get_genai_client(api_key: Optional[str] = None) -> Optional[Any]:
         return None
 
 
+# Alias for backward compatibility across existing agent modules
+get_llm = get_genai_client
+
+
+def invoke_llm_with_retry(client: Any, prompt: str, max_retries: int = 3) -> str:
+    """Invokes LLM with retry-with-backoff handling API quota/rate limits."""
+    if client is None:
+        raise ValueError("GenAI Client instance is None")
+    
+    model_name = os.getenv("LLM_MODEL", "gemini-2.0-flash")
+    last_error = None
+    for attempt in range(1, max_retries + 1):
+        try:
+            response = client.models.generate_content(
+                model=model_name,
+                contents=prompt
+            )
+            return response.text
+        except Exception as e:
+            last_error = e
+            logger.warning(f"Gemini LLM call attempt #{attempt} failed: {e}. Retrying...")
+            time.sleep(attempt * 2)
+
+    raise RuntimeError(f"Gemini LLM call failed after {max_retries} attempts: {last_error}")
+
+
 def analyze_clause_with_gemini(clause_text: str, policy_context: str, api_key: Optional[str] = None) -> Dict[str, Any]:
     """
     Executes a direct LLM reasoning call using Google Gemini API (google-genai SDK) on a target contract clause.
